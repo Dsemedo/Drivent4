@@ -1,4 +1,5 @@
 import { notFoundError, unauthorizedError } from "@/errors";
+import { forbiddenError } from "@/errors/forbidden-error";
 import bookingRepository from "@/repositories/booking-repository";
 import ticketRepository from "@/repositories/ticket-repository";
 
@@ -9,37 +10,36 @@ async function listBooking(userId: number) {
     throw notFoundError();
   }
 
-  return { booking: booking.id, Room: booking.Room };
-}
-
-async function insertBooking(roomId: number, userId: number) {
-  const ticket = await ticketRepository.findTicketByUser(userId);
-  const statusTicket = ticket.status === "RESERVED";
-  const isRemote = ticket.TicketType.isRemote;
-  const includesHotel = ticket.TicketType.includesHotel;
-
-  if(statusTicket || isRemote || !includesHotel) {
-    throw notFoundError();
-  }
-  
-  await verifyingVacancy(roomId);
-
-  const booking = await bookingRepository.createBooking(roomId, userId);
-
   return booking;
 }
 
-async function verifyingVacancy(roomId: number) {
+async function insertBooking(roomId: number, userId: number) {
+  if(!roomId || !userId) {
+    throw notFoundError();
+  }
+  const ticket = await ticketRepository.findTicketByUser(userId);
+  const notIsPaid = ticket.status === "RESERVED";
+  const isRemote = ticket.TicketType.isRemote;
+  const IncludesHotel = ticket.TicketType.includesHotel;
+  
+  const booking = await bookingRepository.createBooking(roomId, userId);
+
   const room = await bookingRepository.findRoomById(roomId);
   const bookings = await bookingRepository.findBookings(roomId);
+
+  if(bookings.length >= room.capacity) {
+    throw forbiddenError();
+  }
+
+  if(!IncludesHotel || notIsPaid || isRemote) {
+    throw forbiddenError();
+  }
 
   if(!room) {
     throw notFoundError();
   }
-  
-  if(bookings.length >= room.capacity) {
-    throw notFoundError();
-  }
+
+  return booking;
 }
 
 async function updateBooking(roomId: number, userId: number, bookingId: number) {
@@ -55,7 +55,7 @@ async function updateBooking(roomId: number, userId: number, bookingId: number) 
 
   const bookingUser = bookingId === booking.id;
   if(!bookingUser) {
-    throw unauthorizedError();
+    throw forbiddenError();
   }
 
   const newBooking = await bookingRepository.updateBooking(bookingId, roomId);
