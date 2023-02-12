@@ -35,17 +35,13 @@ async function insertBooking(roomId: number, userId: number) {
     throw forbiddenError();
   }
 
-  if(!room) {
-    throw notFoundError();
-  }
-
   return booking;
 }
 
 async function updateBooking(roomId: number, userId: number, bookingId: number) {
   const booking = await bookingRepository.returnBooking(userId);
   if(!booking) {
-    throw notFoundError();
+    throw forbiddenError();
   }
   
   const room = await bookingRepository.findRoomById(roomId);
